@@ -4,6 +4,7 @@
 /* Recommended max cache and object sizes */
 #define MAX_CACHE_SIZE 1049000
 #define MAX_OBJECT_SIZE 102400
+#define MAX_HASH_TABLE_SIZE (1 << 16)
 
 /* You won't lose style points for including this long line in your code */
 static const char* user_agent_hdr = "User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:10.0.3) Gecko/20120305 Firefox/10.0.3\r\n";
@@ -14,10 +15,23 @@ static const char* end_of_header = "\r\n";
 static const char* host_key = "Host";
 
 void process(int fd);
-void read_request_headers(rio_t* rp);
 void parse_uri(char* uri, char* hostname, int* port, char* path);
 void set_http_header_to_server(char* http_header, char* hostname, int* port, char* path, rio_t* rio);
 int connect_to_server(char* hostname, int port);
+
+void* thread_main(void* targs);
+unsigned int get_hash_key(char* string);
+void set_table_entry(unsigned int hash_key);
+
+
+typedef struct cached_data
+{
+    char is_used;
+    char data[MAX_OBJECT_SIZE];
+    int data_len
+}cached_data_t;
+
+cached_data_t cache_table[MAX_HASH_TABLE_SIZE] = { 0 };
 
 int main(int argc, char** argv)
 {
@@ -44,9 +58,8 @@ int main(int argc, char** argv)
         Getnameinfo((SA*)&client_addr, client_len, hostname, MAXLINE, port, MAXLINE, 0);
         printf("Accepted connection from (%s %s).\n", hostname, port);
         // Do forward and reverse
-        process(fd_client);
-
-        Close(fd_client);
+        pthread_t thread;
+        pthread_create(&thread, NULL, thread_main, &fd_client);
     }
 
     return 0;
@@ -67,12 +80,21 @@ void process(int fd)
     Rio_readinitb(&rio_client, fd);
     Rio_readlineb(&rio_client, buf, MAXLINE);
     sscanf(buf, "%s %s %s", method, uri, version);
+
     if (strcasecmp(method, "GET"))
     {
         printf("[%s] This method isn't implemented on Proxy server.\n", method);
         return;
     }
-    //...
+    //if hit cache
+    unsigned int hash_key = get_hash_key(uri);
+    if (cache_table[hash_key].is_used)
+    {
+        char* cached_data_buffer = cache_table[hash_key].data;
+        Rio_writen(fd, cached_data_buffer, strlen(cached_data_buffer));
+        return;
+    }
+
     parse_uri(uri, hostname, &port, path);
     set_http_header_to_server(http_header_to_server, hostname, &port, path, &rio_client);
 
@@ -86,25 +108,19 @@ void process(int fd)
     Rio_readinitb(&rio_server, fd_server);
     Rio_writen(fd_server, http_header_to_server, strlen(http_header_to_server));
 
+    set_table_entry(hash_key);
+    char* cache_buf = cache_table[hash_key].data;
+
     size_t len;
     while ((len = Rio_readlineb(&rio_server, buf, MAXLINE)))
     {
         printf("Proxy received %ld Bytes and send\n", len);
         Rio_writen(fd, buf, len);
+        memcpy(cache_buf, buf, len);
+        cache_buf += len;
+        //...
     }
     Close(fd_server);
-}
-
-void read_request_headers(rio_t* rp)
-{
-    char buf[MAXLINE];
-
-    Rio_readlineb(rp, buf, MAXLINE);
-    while (strcmp(buf, "\r\n"))
-    {
-        Rio_readlineb(rp, buf, MAXLINE);
-        printf("%s", buf);
-    }
 }
 
 void parse_uri(char* uri, char* hostname, int* port, char* path)
@@ -113,7 +129,7 @@ void parse_uri(char* uri, char* hostname, int* port, char* path)
     char* port_pos = '\0';
     char* path_pos = '\0';
     char* hostname_pos = strstr(uri, "//");
-    // ex.              https://localhost~ vs localhost~
+    // https://localhost~ vs localhost~
     hostname_pos = hostname_pos ? hostname_pos + 2 : uri;
     port_pos = strstr(hostname_pos, ":");
     // localhost:8884~
@@ -143,7 +159,7 @@ void parse_uri(char* uri, char* hostname, int* port, char* path)
 void set_http_header_to_server(char* http_header, char* hostname, int* port, char* path, rio_t* rio_client)
 {
     static const char* connection_header = "Connection: keep-alive\r\n";
-    static const char* proxy_connection_header = "Proxy-Connection: close\r\n";
+    static const char* proxy_connection_header = "Proxy-Connection: keep-alive\r\n";
 
     char buf[MAXLINE];
     char request_header[MAXLINE];
@@ -192,3 +208,30 @@ int connect_to_server(char* hostname, int port)
     return Open_clientfd(hostname, port_string);
 }
 
+void* thread_main(void* targs)
+{
+    pthread_detach(pthread_self());
+    process(*(int*)targs);
+
+    Close(*(int*)targs);
+
+    return NULL;
+}
+
+unsigned int get_hash_key(char* string)
+{
+    unsigned long long hash = 5381;
+    char* ptr = string;
+    while (*ptr)
+    {
+        hash = ((hash << 5) + hash) + *ptr;
+        ptr++;
+    }
+    return (unsigned int)(hash % MAX_HASH_TABLE_SIZE);
+}
+
+void set_table_entry(unsigned int hash_key)
+{
+    cache_table[hash_key].is_used = 1;
+    memset(cache_table[hash_key].data, 0, MAX_OBJECT_SIZE);
+}

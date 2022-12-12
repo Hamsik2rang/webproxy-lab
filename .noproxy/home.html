@@ -1,0 +1,33 @@
+<html>
+  <head>
+    <title>test</title>
+    <style>
+      video { max-width:50%; margin:20px auto;}
+    </style>
+  </head>
+  <body> 
+    <img align="middle" src="godzilla.gif">
+    <video autoplay controls loop muted>
+      <source src="Clouds.mp4" type="video/mp4">
+      Clouds
+    </video>
+    Im Yongsik
+    <form>
+      <label>Operand 1</label>
+      <input type="text" id="op1">
+      <label>Operand 2</label>
+      <input type="text" id="op2">
+      <button type="button" onclick="add()">Add</button>
+    </form>
+  </body>
+  <script>
+    function add() {
+      let operand1 = document.getElementById("op1").value;
+      let operand2 = document.getElementById("op2").value;
+
+      location.href=`/cgi-bin/adder?${operand1}&${operand2}`
+    }
+
+
+  </script>
+</html>
