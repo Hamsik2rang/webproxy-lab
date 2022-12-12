@@ -12,8 +12,6 @@ static const char* request_line_format = "GET %s HTTP/1.0\r\n";
 static const char* host_header_format = "Host: %s\r\n";
 static const char* end_of_header = "\r\n";
 
-static const char* host_key = "Host";
-
 void process(int fd);
 void parse_uri(char* uri, char* hostname, int* port, char* path);
 void set_http_request_header(char* http_header, char* hostname, int* port, char* path, rio_t* rio);
@@ -157,9 +155,6 @@ void parse_uri(char* uri, char* hostname, int* port, char* path)
 
 void set_http_request_header(char* http_header, char* hostname, int* port, char* path, rio_t* rio_client)
 {
-    static const char* connection_header = "Connection: keep-alive\r\n";
-    static const char* proxy_connection_header = "Proxy-Connection: keep-alive\r\n";
-
     char buf[MAXLINE];
     char request_header[MAXLINE];
     char general_header[MAXLINE];
@@ -172,15 +167,7 @@ void set_http_request_header(char* http_header, char* hostname, int* port, char*
         {
             break;
         }
-
-        if (!strncasecmp(buf, host_key, strlen(host_key)))
-        {
-            strcpy(host_header, buf);
-        }
-        else
-        {
-            strcat(general_header, buf);
-        }
+        strcat(general_header, buf);
     }
 
     if (strlen(host_header) == 0)
@@ -188,11 +175,8 @@ void set_http_request_header(char* http_header, char* hostname, int* port, char*
         sprintf(host_header, host_header_format, hostname);
     }
 
-    sprintf(http_header, "%s%s%s%s%s%s%s",
+    sprintf(http_header, "%s%s%s%s",
         request_header,
-        host_header,
-        connection_header,
-        proxy_connection_header,
         user_agent_hdr,
         general_header,
         end_of_header
