@@ -16,7 +16,7 @@ static const char* host_key = "Host";
 void process(int fd);
 void read_request_headers(rio_t* rp);
 void parse_uri(char* uri, char* hostname, int* port, char* path);
-void set_http_header_to_server(char* http_header, char* hostname, int* port, char* path, rio_t* rio);
+void set_http_request_header(char* http_header, char* hostname, int* port, char* path, rio_t* rio);
 int connect_to_server(char* hostname, int port);
 
 int main(int argc, char** argv)
@@ -74,7 +74,7 @@ void process(int fd)
     }
     //...
     parse_uri(uri, hostname, &port, path);
-    set_http_header_to_server(http_header_to_server, hostname, &port, path, &rio_client);
+    set_http_request_header(http_header_to_server, hostname, &port, path, &rio_client);
 
     fd_server = connect_to_server(hostname, port);
     if (fd_server < 0)
@@ -140,7 +140,7 @@ void parse_uri(char* uri, char* hostname, int* port, char* path)
     }
 }
 
-void set_http_header_to_server(char* http_header, char* hostname, int* port, char* path, rio_t* rio_client)
+void set_http_request_header(char* http_header, char* hostname, int* port, char* path, rio_t* rio_client)
 {
     static const char* connection_header = "Connection: keep-alive\r\n";
     static const char* proxy_connection_header = "Proxy-Connection: close\r\n";

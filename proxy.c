@@ -16,7 +16,7 @@ static const char* host_key = "Host";
 
 void process(int fd);
 void parse_uri(char* uri, char* hostname, int* port, char* path);
-void set_http_header_to_server(char* http_header, char* hostname, int* port, char* path, rio_t* rio);
+void set_http_request_header(char* http_header, char* hostname, int* port, char* path, rio_t* rio);
 int connect_to_server(char* hostname, int port);
 
 void* thread_main(void* targs);
@@ -28,7 +28,6 @@ typedef struct cached_data
 {
     char is_used;
     char data[MAX_OBJECT_SIZE];
-    int data_len
 }cached_data_t;
 
 cached_data_t cache_table[MAX_HASH_TABLE_SIZE] = { 0 };
@@ -96,7 +95,7 @@ void process(int fd)
     }
 
     parse_uri(uri, hostname, &port, path);
-    set_http_header_to_server(http_header_to_server, hostname, &port, path, &rio_client);
+    set_http_request_header(http_header_to_server, hostname, &port, path, &rio_client);
 
     fd_server = connect_to_server(hostname, port);
     if (fd_server < 0)
@@ -156,7 +155,7 @@ void parse_uri(char* uri, char* hostname, int* port, char* path)
     }
 }
 
-void set_http_header_to_server(char* http_header, char* hostname, int* port, char* path, rio_t* rio_client)
+void set_http_request_header(char* http_header, char* hostname, int* port, char* path, rio_t* rio_client)
 {
     static const char* connection_header = "Connection: keep-alive\r\n";
     static const char* proxy_connection_header = "Proxy-Connection: keep-alive\r\n";
@@ -164,7 +163,6 @@ void set_http_header_to_server(char* http_header, char* hostname, int* port, cha
     char buf[MAXLINE];
     char request_header[MAXLINE];
     char general_header[MAXLINE];
-    // char entity_header[MAXLINE];
     char host_header[MAXLINE];
 
     sprintf(request_header, request_line_format, path);
